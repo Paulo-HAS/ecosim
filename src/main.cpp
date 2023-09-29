@@ -4,6 +4,7 @@
 #include "crow_all.h"
 #include "json.hpp"
 #include <random>
+#include <thread>
 
 static const uint32_t NUM_ROWS = 15;
 
@@ -51,7 +52,8 @@ struct entity_info{
     pos_t pos;
 };
 
-std::vector<entity_info> entity_vector; //vetor de entidades
+bool g_clock = false;
+
 
 // Auxiliary code to convert the entity_type_t enum to a string
 NLOHMANN_JSON_SERIALIZE_ENUM(entity_type_t, {
@@ -73,6 +75,24 @@ namespace nlohmann
 // Grid that contains the entities
 static std::vector<std::vector<entity_t>> entity_grid;
 
+
+void simulateEntity(entity_info* en){
+    bool clock = false;
+    bool alive = true;
+    while(true)
+        if(en->t->type == empty)
+            return;
+        if(clock != g_clock){
+            alive = death_sim(en);
+            if(!alive)
+                return;
+            feed_sim(en);
+            reproduction_sim(en);
+            move_sim(en);
+            en->t->age++;
+        }
+
+}
 
 void spawn_entity(entity_type_t type){
 
@@ -96,352 +116,332 @@ void spawn_entity(entity_type_t type){
     info.t = &entity_grid[random_row][random_col];
     info.pos.i = random_row;
     info.pos.j = random_col;
-    entity_vector.push_back(info);
+    std::thread (simulateEntity, &info).detach();
 }
 
-void reproduction_sim(){
+void reproduction_sim(entity_info* en){
     std::random_device rd;
     static std::mt19937 gen(rd());      //Generating random chance for reproduction
     std::uniform_int_distribution<int> dice(0, 100);
-    for(int it = 0; it < entity_vector.size(); it++){
-        float chance = 100;
-        int i = entity_vector[it].pos.i;
-        int j = entity_vector[it].pos.j;
+    float chance = 100;
+    int i = en->pos.i;
+    int j = en->pos.j;
 
-        bool cres = false;
-        entity_type_t aux_type = entity_vector[it].t->type;
-        if(aux_type == plant)
-            chance *= PLANT_REPRODUCTION_PROBABILITY;
-        else if(aux_type == herbivore)
-            chance *= HERBIVORE_REPRODUCTION_PROBABILITY;
-        else if(aux_type == carnivore)
-            chance *= CARNIVORE_REPRODUCTION_PROBABILITY;
-        
-        if(i > 0 && entity_grid[i-1][j].type == empty){
-            int rc = dice(gen);
-            if(rc < chance){
-                entity_t new_entity;
-                new_entity.age = 0;
-                new_entity.type = aux_type;
-                new_entity.energy = 100;
-                
-                entity_grid[i - 1][j] = new_entity;
+    bool cres = false;
+    entity_type_t aux_type = en->t->type;
+    if(aux_type == plant)
+        chance *= PLANT_REPRODUCTION_PROBABILITY;
+    else if(aux_type == herbivore)
+        chance *= HERBIVORE_REPRODUCTION_PROBABILITY;
+    else if(aux_type == carnivore)
+        chance *= CARNIVORE_REPRODUCTION_PROBABILITY;
+    
+    if(i > 0 && entity_grid[i-1][j].type == empty){
+        int rc = dice(gen);
+        if(rc < chance){
+            entity_t new_entity;
+            new_entity.age = 0;
+            new_entity.type = aux_type;
+            new_entity.energy = 100;
+            
+            entity_grid[i - 1][j] = new_entity;
 
-                entity_info info;
-                info.t = &entity_grid[i - 1][j];
-                info.pos.i = i-1;
-                info.pos.j = j;
-                entity_vector.push_back(info);
-                cres = true;
-            }
+            entity_info info;
+            info.t = &entity_grid[i - 1][j];
+            info.pos.i = i-1;
+            info.pos.j = j;
+            std::thread (simulateEntity, &info).detach();
+            cres = true;
         }
-        if(j > 0 && entity_grid[i][j-1].type == empty && cres == false){
-            int rc = dice(gen);
-            if(rc < chance){
-                entity_t new_entity;
-                new_entity.age = 0;
-                new_entity.type = aux_type;
-                new_entity.energy = 100;
-                
-                entity_grid[i][j-1] = new_entity;
+    }
+    if(j > 0 && entity_grid[i][j-1].type == empty && cres == false){
+        int rc = dice(gen);
+        if(rc < chance){
+            entity_t new_entity;
+            new_entity.age = 0;
+            new_entity.type = aux_type;
+            new_entity.energy = 100;
+            
+            entity_grid[i][j-1] = new_entity;
 
-                entity_info info;
-                info.t = &entity_grid[i][j-1];
-                info.pos.i = i;
-                info.pos.j = j-1;
-                entity_vector.push_back(info);
-                cres = true;
-            }
+            entity_info info;
+            info.t = &entity_grid[i][j-1];
+            info.pos.i = i;
+            info.pos.j = j-1;
+            std::thread (simulateEntity, &info).detach();
+            cres = true;
         }
-        if(i < NUM_ROWS-1 && entity_grid[i+1][j].type == empty && cres == false){
-            int rc = dice(gen);
-            if(rc < chance){
-                entity_t new_entity;
-                new_entity.age = 0;
-                new_entity.type = aux_type;
-                new_entity.energy = 100;
-                
-                entity_grid[i+1][j] = new_entity;
+    }
+    if(i < NUM_ROWS-1 && entity_grid[i+1][j].type == empty && cres == false){
+        int rc = dice(gen);
+        if(rc < chance){
+            entity_t new_entity;
+            new_entity.age = 0;
+            new_entity.type = aux_type;
+            new_entity.energy = 100;
+            
+            entity_grid[i+1][j] = new_entity;
 
-                entity_info info;
-                info.t = &entity_grid[i+1][j];
-                info.pos.i = i+1;
-                info.pos.j = j;
-                entity_vector.push_back(info);
-                cres = true;
-            }
+            entity_info info;
+            info.t = &entity_grid[i+1][j];
+            info.pos.i = i+1;
+            info.pos.j = j;
+            std::thread (simulateEntity, &info).detach();
+            cres = true;
         }
-        if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == empty && cres == false){
-            int rc = dice(gen);
-            if(rc < chance){
-                entity_t new_entity;
-                new_entity.age = 0;
-                new_entity.type = aux_type;
-                new_entity.energy = 100;
-                
-                entity_grid[i][j+1] = new_entity;
+    }
+    if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == empty && cres == false){
+        int rc = dice(gen);
+        if(rc < chance){
+            entity_t new_entity;
+            new_entity.age = 0;
+            new_entity.type = aux_type;
+            new_entity.energy = 100;
+            
+            entity_grid[i][j+1] = new_entity;
 
-                entity_info info;
-                info.t = &entity_grid[i][j+1];
-                info.pos.i = i;
-                info.pos.j = j+1;
-                entity_vector.push_back(info);
-                cres = true;
-            }
+            entity_info info;
+            info.t = &entity_grid[i][j+1];
+            info.pos.i = i;
+            info.pos.j = j+1;
+            std::thread (simulateEntity, &info).detach();
+            cres = true;
         }
     }
 
 }
 
-void kill_entity(int i, int j){
-    for(int it = 0;it < entity_vector.size();i++){
-        if(entity_vector[it].pos.i == i && entity_vector[it].pos.j == j){
-            entity_vector.erase (entity_vector.begin() + it);
-            entity_grid[i][j].type = empty;
-            return;
-        }
-    }
+void kill_entity(entity_info* en){
+    entity_grid[en->pos.i][en->pos.j].type = empty;
+    
 }
 
-void move_sim(){
+void move_sim(entity_info* en){
     std::random_device rd;
     static std::mt19937 gen(rd());      //Generating random chance for moving
     std::uniform_int_distribution<int> dice(0, 100);
     
-    for(int it = 0; it < entity_vector.size(); it++){
-        float chance = 100;
-        int i = entity_vector[it].pos.i;
-        int j = entity_vector[it].pos.j;
-        entity_type_t aux_type = entity_vector[it].t->type;
-        bool moved = false;
+    float chance = 100;
+    int i = en->pos.i;
+    int j = en->pos.j;
+    entity_type_t aux_type = en->t->type;
+    bool moved = false;
 
-        if(aux_type == herbivore)
-            chance *= HERBIVORE_MOVE_PROBABILITY;
-        else if(aux_type == carnivore)
-            chance *= CARNIVORE_MOVE_PROBABILITY;
+    if(aux_type == herbivore)
+        chance *= HERBIVORE_MOVE_PROBABILITY;
+    else if(aux_type == carnivore)
+        chance *= CARNIVORE_MOVE_PROBABILITY;
 
 
-        if(aux_type == herbivore){
-            if(i > 0 && entity_grid[i-1][j].type != carnivore){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i-1][j].type == plant){
-                        entity_vector[it].t->energy += 30;
-                        kill_entity(i-1,j);
-                    }
-                    entity_grid[i-1][j] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i-1][j];
-                    entity_vector[it].pos.i--;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
+    if(aux_type == herbivore){
+        if(i > 0 && entity_grid[i-1][j].type != carnivore){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i-1][j].type == plant){
+                    en->t->energy += 30;
+                    kill_entity(i-1,j);
                 }
-            }
-            if(j > 0 &&entity_grid[i][j-1].type != carnivore){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i][j-1].type == plant){
-                        entity_vector[it].t->energy += 30;
-                        kill_entity(i,j-1);
-                    }
-                    entity_grid[i][j-1] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i][j-1];
-                    entity_vector[it].pos.j--;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
-                }
-            }
-            if(i < NUM_ROWS-1 && entity_grid[i+1][j].type != carnivore){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i+1][j].type == plant){
-                        entity_vector[it].t->energy += 30;
-                        kill_entity(i+1,j);
-                    }
-                    entity_grid[i+1][j] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i+1][j];
-                    entity_vector[it].pos.i++;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
-                }
-            }
-            if(j < NUM_ROWS-1 && entity_grid[i][j+1].type != carnivore){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i][j+1].type == plant){
-                        entity_vector[it].t->energy += 30;
-                        kill_entity(i,j+1);
-                    }
-                    entity_grid[i][j+1] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i][j+1];
-                    entity_vector[it].pos.j++;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
-                }
+                entity_grid[i-1][j] = entity_grid[i][j];
+                en->t = &entity_grid[i-1][j];
+                en->pos.i--;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
             }
         }
+        if(j > 0 &&entity_grid[i][j-1].type != carnivore){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i][j-1].type == plant){
+                    en->t->energy += 30;
+                    kill_entity(i,j-1);
+                }
+                entity_grid[i][j-1] = entity_grid[i][j];
+                en->t = &entity_grid[i][j-1];
+                en->pos.j--;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
+            }
+        }
+        if(i < NUM_ROWS-1 && entity_grid[i+1][j].type != carnivore){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i+1][j].type == plant){
+                    en->t->energy += 30;
+                    kill_entity(i+1,j);
+                }
+                entity_grid[i+1][j] = entity_grid[i][j];
+                en->t = &entity_grid[i+1][j];
+                en->pos.i++;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
+            }
+        }
+        if(j < NUM_ROWS-1 && entity_grid[i][j+1].type != carnivore){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i][j+1].type == plant){
+                    en->t->energy += 30;
+                    kill_entity(i,j+1);
+                }
+                entity_grid[i][j+1] = entity_grid[i][j];
+                en->t = &entity_grid[i][j+1];
+                en->pos.j++;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
+            }
+        }
+    }
 
-        if(aux_type == carnivore){
-            if(i > 0 && entity_grid[i-1][j].type != plant){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i-1][j].type == herbivore){
-                        entity_vector[it].t->energy += 20;
-                        kill_entity(i-1,j);
-                    }
-                    entity_grid[i-1][j] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i-1][j];
-                    entity_vector[it].pos.i--;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
+    if(aux_type == carnivore){
+        if(i > 0 && entity_grid[i-1][j].type != plant){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i-1][j].type == herbivore){
+                    en->t->energy += 20;
+                    kill_entity(i-1,j);
                 }
+                entity_grid[i-1][j] = entity_grid[i][j];
+                en->t = &entity_grid[i-1][j];
+                en->pos.i--;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
             }
-            if(j > 0 &&entity_grid[i][j-1].type != plant){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i][j-1].type == herbivore){
-                        entity_vector[it].t->energy += 20;
-                        kill_entity(i,j-1);
-                    }
-                    entity_grid[i][j-1] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i][j-1];
-                    entity_vector[it].pos.j--;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
+        }
+        if(j > 0 &&entity_grid[i][j-1].type != plant){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i][j-1].type == herbivore){
+                    en->t->energy += 20;
+                    kill_entity(i,j-1);
                 }
+                entity_grid[i][j-1] = entity_grid[i][j];
+                en->t = &entity_grid[i][j-1];
+                en->pos.j--;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
             }
-            if(i < NUM_ROWS-1 && entity_grid[i+1][j].type != plant){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i+1][j].type == herbivore){
-                        entity_vector[it].t->energy += 20;
-                        kill_entity(i+1,j);
-                    }
-                    entity_grid[i+1][j] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i+1][j];
-                    entity_vector[it].pos.i++;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
+        }
+        if(i < NUM_ROWS-1 && entity_grid[i+1][j].type != plant){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i+1][j].type == herbivore){
+                    en->t->energy += 20;
+                    kill_entity(i+1,j);
                 }
+                entity_grid[i+1][j] = entity_grid[i][j];
+                en->t = &entity_grid[i+1][j];
+                en->pos.i++;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
             }
-            if(j < NUM_ROWS-1 && entity_grid[i][j+1].type != plant){
-                int mc = dice(gen);
-                if(mc < chance){
-                    if(entity_grid[i][j+1].type == herbivore){
-                        entity_vector[it].t->energy += 20;
-                        kill_entity(i,j+1);
-                    }
-                    entity_grid[i][j+1] = entity_grid[i][j];
-                    entity_vector[it].t = &entity_grid[i][j+1];
-                    entity_vector[it].pos.j++;
-                    entity_grid[i][j].type = empty;
-                    entity_vector[it].t->energy -= 5;
+        }
+        if(j < NUM_ROWS-1 && entity_grid[i][j+1].type != plant){
+            int mc = dice(gen);
+            if(mc < chance){
+                if(entity_grid[i][j+1].type == herbivore){
+                    en->t->energy += 20;
+                    kill_entity(i,j+1);
                 }
+                entity_grid[i][j+1] = entity_grid[i][j];
+                en->t = &entity_grid[i][j+1];
+                en->pos.j++;
+                entity_grid[i][j].type = empty;
+                en->t->energy -= 5;
             }
         }
     }
 }
 
-void feed_sim(){
+void feed_sim(entity_info* en){
     std::random_device rd;
     static std::mt19937 gen(rd());      //Generating random chance for moving
     std::uniform_int_distribution<int> dice(0, 100);
     
-    for(int it = 0; it < entity_vector.size(); it++){
-        float chance = 100;
-        int i = entity_vector[it].pos.i;
-        int j = entity_vector[it].pos.j;
-        entity_type_t aux_type = entity_vector[it].t->type;
-        bool fed = false;
-        if(aux_type == herbivore)
-            chance *= HERBIVORE_EAT_PROBABILITY;
-        else if(aux_type == carnivore)
-            chance *= CARNIVORE_EAT_PROBABILITY;
-        
-        if(aux_type == herbivore){
-            if(i > 0 && entity_grid[i-1][j].type == plant){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 30;
-                    kill_entity(i-1,j);
-                }
-            }
-            if(j > 0 && entity_grid[i][j-1].type == plant){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 30;
-                    kill_entity(i,j-1);
-                }
-            }
-            if(i < NUM_ROWS-1  && entity_grid[i+1][j].type == plant){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 30;
-                    kill_entity(i+1,j);
-                }
-            }
-            if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == plant){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 30;
-                    kill_entity(i,j+1);
-                }
-            }
-        }
-        if(aux_type == carnivore){
-            if(i > 0 && entity_grid[i-1][j].type == herbivore){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 20;
-                    kill_entity(i-1,j);
-                }
-            }
-            if(j > 0 && entity_grid[i][j-1].type == herbivore){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 20;
-                    kill_entity(i,j-1);
-                }
-            }
-            if(i < NUM_ROWS-1  && entity_grid[i+1][j].type == herbivore){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 20;
-                    kill_entity(i+1,j);
-                }
-            }
-            if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == herbivore){
-                int fc = dice(gen);
-                if(fc > chance){
-                    entity_vector[it].t->energy += 20;
-                    kill_entity(i,j+1);
-                }
-            }
-        }
-    }
-}
-
-void death_sim(){
-    for(int it = 0; it < entity_vector.size(); it++){
-        int i = entity_vector[it].pos.i;
-        int j = entity_vector[it].pos.j;
-        if(entity_vector[it].t->energy <= 0)
-            kill_entity(i,j);
-        if(entity_vector[it].t->type == plant && (entity_vector[it].t->age >= PLANT_MAXIMUM_AGE || entity_vector[it].t->energy <= 0))
-            kill_entity(i,j);
-        if(entity_vector[it].t->type == herbivore && (entity_vector[it].t->age >= HERBIVORE_MAXIMUM_AGE || entity_vector[it].t->energy <= 0))
-            kill_entity(i,j);
-        if(entity_vector[it].t->type == carnivore && (entity_vector[it].t->age >= CARNIVORE_MAXIMUM_AGE || entity_vector[it].t->energy <= 0))
-            kill_entity(i,j);
-    }
-}
-
-void iterate_sim(){
-    death_sim();
-    feed_sim();
-    move_sim();
+    float chance = 100;
+    int i = en->pos.i;
+    int j = en->pos.j;
+    entity_type_t aux_type = en->t->type;
+    bool fed = false;
+    if(aux_type == herbivore)
+        chance *= HERBIVORE_EAT_PROBABILITY;
+    else if(aux_type == carnivore)
+        chance *= CARNIVORE_EAT_PROBABILITY;
     
-    for(int i = 0; i < entity_vector.size(); i++)
-        entity_vector[i].t->age++;
+    if(aux_type == herbivore){
+        if(i > 0 && entity_grid[i-1][j].type == plant){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 30;
+                kill_entity(i-1,j);
+            }
+        }
+        if(j > 0 && entity_grid[i][j-1].type == plant){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 30;
+                kill_entity(i,j-1);
+            }
+        }
+        if(i < NUM_ROWS-1  && entity_grid[i+1][j].type == plant){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 30;
+                kill_entity(i+1,j);
+            }
+        }
+        if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == plant){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 30;
+                kill_entity(i,j+1);
+            }
+        }
+    }
+    if(aux_type == carnivore){
+        if(i > 0 && entity_grid[i-1][j].type == herbivore){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 20;
+                kill_entity(i-1,j);
+            }
+        }
+        if(j > 0 && entity_grid[i][j-1].type == herbivore){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 20;
+                kill_entity(i,j-1);
+            }
+        }
+        if(i < NUM_ROWS-1  && entity_grid[i+1][j].type == herbivore){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 20;
+                kill_entity(i+1,j);
+            }
+        }
+        if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == herbivore){
+            int fc = dice(gen);
+            if(fc > chance){
+                en->t->energy += 20;
+                kill_entity(i,j+1);
+            }
+        }
+    }
+}
+
+bool death_sim(entity_info* en){
+    else if(en->t->type == plant && (en->t->age >= PLANT_MAXIMUM_AGE || en->t->energy <= 0)){
+        kill_entity(en);
+        return false;
+    }
+    else if(en->t->type == herbivore && (en->t->age >= HERBIVORE_MAXIMUM_AGE || en->t->energy <= 0)){
+        kill_entity(en);
+        return false;
+    }
+    else if(en->t->type == carnivore && (en->t->age >= CARNIVORE_MAXIMUM_AGE || en->t->energy <= 0)){
+        kill_entity(en);
+        return false;
+    }
 }
 
 int main()
@@ -499,7 +499,10 @@ int main()
         // Iterate over the entity grid and simulate the behaviour of each entity
         
         // <YOUR CODE HERE>
-        iterate_sim();
+        if(g_clock)
+            g_clock = false;
+        else
+            g_clock = true;
         
         // Return the JSON representation of the entity grid
         nlohmann::json json_grid = entity_grid; 
