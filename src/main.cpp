@@ -75,25 +75,6 @@ namespace nlohmann
 // Grid that contains the entities
 static std::vector<std::vector<entity_t>> entity_grid;
 
-
-void simulateEntity(entity_info* en){
-    bool clock = false;
-    bool alive = true;
-    while(true)
-        if(en->t->type == empty)
-            return;
-        if(clock != g_clock){
-            alive = death_sim(en);
-            if(!alive)
-                return;
-            feed_sim(en);
-            reproduction_sim(en);
-            move_sim(en);
-            en->t->age++;
-        }
-
-}
-
 void spawn_entity(entity_type_t type){
 
     std::random_device rd;
@@ -211,8 +192,8 @@ void reproduction_sim(entity_info* en){
 
 }
 
-void kill_entity(entity_info* en){
-    entity_grid[en->pos.i][en->pos.j].type = empty;
+void kill_entity(entity_t* t){
+    t->type = empty;
     
 }
 
@@ -239,7 +220,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i-1][j].type == plant){
                     en->t->energy += 30;
-                    kill_entity(i-1,j);
+                    kill_entity(&entity_grid[i-1][j]);
                 }
                 entity_grid[i-1][j] = entity_grid[i][j];
                 en->t = &entity_grid[i-1][j];
@@ -253,7 +234,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i][j-1].type == plant){
                     en->t->energy += 30;
-                    kill_entity(i,j-1);
+                    kill_entity(&entity_grid[i][j-1]);
                 }
                 entity_grid[i][j-1] = entity_grid[i][j];
                 en->t = &entity_grid[i][j-1];
@@ -267,7 +248,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i+1][j].type == plant){
                     en->t->energy += 30;
-                    kill_entity(i+1,j);
+                    kill_entity(&entity_grid[i+1][j]);
                 }
                 entity_grid[i+1][j] = entity_grid[i][j];
                 en->t = &entity_grid[i+1][j];
@@ -281,7 +262,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i][j+1].type == plant){
                     en->t->energy += 30;
-                    kill_entity(i,j+1);
+                    kill_entity(&entity_grid[i][j+1]);
                 }
                 entity_grid[i][j+1] = entity_grid[i][j];
                 en->t = &entity_grid[i][j+1];
@@ -298,7 +279,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i-1][j].type == herbivore){
                     en->t->energy += 20;
-                    kill_entity(i-1,j);
+                    kill_entity(&entity_grid[i-1][j]);
                 }
                 entity_grid[i-1][j] = entity_grid[i][j];
                 en->t = &entity_grid[i-1][j];
@@ -312,7 +293,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i][j-1].type == herbivore){
                     en->t->energy += 20;
-                    kill_entity(i,j-1);
+                    kill_entity(&entity_grid[i][j-1]);
                 }
                 entity_grid[i][j-1] = entity_grid[i][j];
                 en->t = &entity_grid[i][j-1];
@@ -326,7 +307,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i+1][j].type == herbivore){
                     en->t->energy += 20;
-                    kill_entity(i+1,j);
+                    kill_entity(&entity_grid[i+1],[j]);
                 }
                 entity_grid[i+1][j] = entity_grid[i][j];
                 en->t = &entity_grid[i+1][j];
@@ -340,7 +321,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i][j+1].type == herbivore){
                     en->t->energy += 20;
-                    kill_entity(i,j+1);
+                    kill_entity(&entity_grid[i][j+1]);
                 }
                 entity_grid[i][j+1] = entity_grid[i][j];
                 en->t = &entity_grid[i][j+1];
@@ -372,28 +353,28 @@ void feed_sim(entity_info* en){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 30;
-                kill_entity(i-1,j);
+                kill_entity(&entity_grid[i-1][j]);
             }
         }
         if(j > 0 && entity_grid[i][j-1].type == plant){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 30;
-                kill_entity(i,j-1);
+                kill_entity(&entity_grid[i][j-1]);
             }
         }
         if(i < NUM_ROWS-1  && entity_grid[i+1][j].type == plant){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 30;
-                kill_entity(i+1,j);
+                kill_entity(&entity_grid[i+1][j]);
             }
         }
         if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == plant){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 30;
-                kill_entity(i,j+1);
+                kill_entity(&entity_grid[i][j+1]);
             }
         }
     }
@@ -402,46 +383,64 @@ void feed_sim(entity_info* en){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 20;
-                kill_entity(i-1,j);
+                kill_entity(&entity_grid[i-1][j]);
             }
         }
         if(j > 0 && entity_grid[i][j-1].type == herbivore){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 20;
-                kill_entity(i,j-1);
+                kill_entity(&entity_grid[i][j-1]);
             }
         }
         if(i < NUM_ROWS-1  && entity_grid[i+1][j].type == herbivore){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 20;
-                kill_entity(i+1,j);
+                kill_entity(&entity_grid[i+1][j]);
             }
         }
         if(j < NUM_ROWS-1 && entity_grid[i][j+1].type == herbivore){
             int fc = dice(gen);
             if(fc > chance){
                 en->t->energy += 20;
-                kill_entity(i,j+1);
+                kill_entity(&entity_grid[i][j+1]);
             }
         }
     }
 }
 
 bool death_sim(entity_info* en){
-    else if(en->t->type == plant && (en->t->age >= PLANT_MAXIMUM_AGE || en->t->energy <= 0)){
-        kill_entity(en);
+    if(en->t->type == plant && (en->t->age >= PLANT_MAXIMUM_AGE || en->t->energy <= 0)){
+        kill_entity(en->t);
         return false;
     }
     else if(en->t->type == herbivore && (en->t->age >= HERBIVORE_MAXIMUM_AGE || en->t->energy <= 0)){
-        kill_entity(en);
+        kill_entity(en->t);
         return false;
     }
     else if(en->t->type == carnivore && (en->t->age >= CARNIVORE_MAXIMUM_AGE || en->t->energy <= 0)){
-        kill_entity(en);
+        kill_entity(en->t);
         return false;
     }
+}
+
+void simulateEntity(entity_info* en){
+    bool clock = false;
+    bool alive = true;
+    while(true)
+        if(en->t->type == empty)
+            return;
+        if(clock != g_clock){
+            alive = death_sim(en);
+            if(!alive)
+                return;
+            feed_sim(en);
+            reproduction_sim(en);
+            move_sim(en);
+            en->t->age++;
+        }
+
 }
 
 int main()
