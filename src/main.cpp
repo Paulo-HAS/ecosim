@@ -47,7 +47,7 @@ struct entity_t
     int32_t age;
 };
 
-struct entity_info{
+struct entity_info{     //struct com um ponteiro para a entidade e sua posição
     entity_t* t;
     pos_t pos;
 };
@@ -75,32 +75,9 @@ namespace nlohmann
 // Grid that contains the entities
 static std::vector<std::vector<entity_t>> entity_grid;
 
-void spawn_entity(entity_type_t type){
+void simulateEntity(entity_info* en);   //declaração antecipada da função de simulação para poder ser chamada na reprodução
 
-    std::random_device rd;
-    static std::mt19937 gen(rd());      //Generating random positions for the entities
-
-    std::uniform_int_distribution<int> distribution_cols(0, NUM_ROWS-1);
-    std::uniform_int_distribution<int> distribution_rows(0, NUM_ROWS-1);
-
-    int random_col = distribution_cols(gen);
-    int random_row = distribution_rows(gen);
-
-    entity_t new_entity;
-    new_entity.age = 0;
-    new_entity.type = type;
-    new_entity.energy = 100;
-    
-    entity_grid[random_row][random_col] = new_entity;
-
-    entity_info info;
-    info.t = &entity_grid[random_row][random_col];
-    info.pos.i = random_row;
-    info.pos.j = random_col;
-    std::thread (simulateEntity, &info).detach();
-}
-
-void reproduction_sim(entity_info* en){
+void reproduction_sim(entity_info* en){     //reprodução dos indivíduos
     std::random_device rd;
     static std::mt19937 gen(rd());      //Generating random chance for reproduction
     std::uniform_int_distribution<int> dice(0, 100);
@@ -192,12 +169,11 @@ void reproduction_sim(entity_info* en){
 
 }
 
-void kill_entity(entity_t* t){
+void kill_entity(entity_t* t){     //esvazia a posição no grid, o que fará o thread correspondente parar
     t->type = empty;
-    
 }
 
-void move_sim(entity_info* en){
+void move_sim(entity_info* en){     //movimentação dos animais
     std::random_device rd;
     static std::mt19937 gen(rd());      //Generating random chance for moving
     std::uniform_int_distribution<int> dice(0, 100);
@@ -307,7 +283,7 @@ void move_sim(entity_info* en){
             if(mc < chance){
                 if(entity_grid[i+1][j].type == herbivore){
                     en->t->energy += 20;
-                    kill_entity(&entity_grid[i+1],[j]);
+                    kill_entity(&entity_grid[i+1][j]);
                 }
                 entity_grid[i+1][j] = entity_grid[i][j];
                 en->t = &entity_grid[i+1][j];
@@ -333,7 +309,7 @@ void move_sim(entity_info* en){
     }
 }
 
-void feed_sim(entity_info* en){
+void feed_sim(entity_info* en){     //alimentação dos animais
     std::random_device rd;
     static std::mt19937 gen(rd());      //Generating random chance for moving
     std::uniform_int_distribution<int> dice(0, 100);
@@ -410,7 +386,7 @@ void feed_sim(entity_info* en){
     }
 }
 
-bool death_sim(entity_info* en){
+bool death_sim(entity_info* en){       //verifica morte por idade/energia
     if(en->t->type == plant && (en->t->age >= PLANT_MAXIMUM_AGE || en->t->energy <= 0)){
         kill_entity(en->t);
         return false;
@@ -423,24 +399,57 @@ bool death_sim(entity_info* en){
         kill_entity(en->t);
         return false;
     }
+    return true;
 }
 
-void simulateEntity(entity_info* en){
-    bool clock = false;
+void simulateEntity(entity_info* en){   //função das threads
+    bool clock = false;     //Se o clock individual das threads difere do global, é porque houve uma iteração
     bool alive = true;
-    while(true)
+    while(alive){
         if(en->t->type == empty)
             return;
         if(clock != g_clock){
-            alive = death_sim(en);
-            if(!alive)
-                return;
             feed_sim(en);
             reproduction_sim(en);
             move_sim(en);
-            en->t->age++;
+            en->t->age++;   //envelhece
+            alive = death_sim(en);
         }
+    }
 
+}
+
+void spawn_entity(entity_type_t type){      //gera os indivíduos iniciais
+
+    std::random_device rd;
+    static std::mt19937 gen(rd());      //Generating random positions for the entities
+
+    std::uniform_int_distribution<int> distribution_cols(0, NUM_ROWS-1);
+    std::uniform_int_distribution<int> distribution_rows(0, NUM_ROWS-1);
+
+    int random_col = distribution_cols(gen);
+    int random_row = distribution_rows(gen);
+
+    entity_t new_entity;
+    new_entity.age = 0;
+    new_entity.type = type;
+    new_entity.energy = 100;
+    
+    entity_grid[random_row][random_col] = new_entity;
+
+    entity_info info;
+    info.t = &entity_grid[random_row][random_col];
+    info.pos.i = random_row;
+    info.pos.j = random_col;
+    std::thread (simulateEntity, &info).detach();
+}
+
+void iterate_sim(){     //função que roda o clock global de simulação acompanhando iterações
+    if(g_clock)
+            g_clock = false;
+        else
+            g_clock = true;
+        printf("\nClock");
 }
 
 int main()
@@ -484,12 +493,12 @@ int main()
         for(int i=0; i<(uint32_t)request_body["herbivores"];i++)
             spawn_entity(herbivore);
 
-
         // Return the JSON representation of the entity grid
         nlohmann::json json_grid = entity_grid; 
         res.body = json_grid.dump();
         res.end(); });
 
+    
     // Endpoint to process HTTP GET requests for the next simulation iteration
     CROW_ROUTE(app, "/next-iteration")
         .methods("GET"_method)([]()
@@ -498,11 +507,9 @@ int main()
         // Iterate over the entity grid and simulate the behaviour of each entity
         
         // <YOUR CODE HERE>
-        if(g_clock)
-            g_clock = false;
-        else
-            g_clock = true;
+        iterate_sim();
         
+
         // Return the JSON representation of the entity grid
         nlohmann::json json_grid = entity_grid; 
         return json_grid.dump(); });
